@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>우리의 9월</title>
+    <meta name="description" content="2026년 9월 팀 챌린지 기록판" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="hero">
+        <p class="label">TEAM CHALLENGE · SEPTEMBER</p>
+        <h1>우리의 9월</h1>
+        <p class="quote">
+          나를 죽이지 못 하는 고통은,<br />
+          나를 더 강하게 만든다.
+        </p>
+        <div class="hero-meta">
+          <span>2026.09.01 - 2026.09.30</span>
+          <strong id="ddayText">D-day</strong>
+        </div>
+      </header>
+
+      <section class="status-bar" aria-label="저장 상태">
+        <div>
+          <strong id="syncStatusText">이 기기에만 저장 중</strong>
+          <span id="syncDetailText">syncUrl을 입력하면 공동 저장이 활성화됩니다.</span>
+        </div>
+        <button id="refreshButton" class="ghost-button" type="button">기록 새로고침</button>
+      </section>
+
+      <section class="summary-strip" aria-label="팀 누적 벌금">
+        <span>팀 누적 벌금</span>
+        <strong id="teamFineText">0원</strong>
+      </section>
+
+      <main>
+        <section class="section-block" aria-labelledby="todayTitle">
+          <div class="section-heading">
+            <div>
+              <p class="label">TODAY</p>
+              <h2 id="todayTitle">오늘의 미션</h2>
+            </div>
+            <span id="todayText" class="date-pill">오늘</span>
+          </div>
+          <div id="missionCards" class="mission-list"></div>
+        </section>
+
+        <section class="section-block" aria-labelledby="gridTitle">
+          <div class="section-heading">
+            <div>
+              <p class="label">CALENDAR</p>
+              <h2 id="gridTitle">날짜별 기록표</h2>
+            </div>
+          </div>
+          <div id="recordGrid" class="record-grid-wrap"></div>
+        </section>
+
+        <section class="section-block" aria-labelledby="rankingTitle">
+          <div class="section-heading">
+            <div>
+              <p class="label">RANKING</p>
+              <h2 id="rankingTitle">순위</h2>
+            </div>
+          </div>
+          <div id="rankingList" class="ranking-list"></div>
+        </section>
+
+        <section class="section-block" aria-labelledby="backupTitle">
+          <div class="section-heading">
+            <div>
+              <p class="label">BACKUP</p>
+              <h2 id="backupTitle">로컬 백업</h2>
+            </div>
+          </div>
+          <div class="backup-actions">
+            <button id="exportButton" class="ghost-button" type="button">JSON 내보내기</button>
+            <label class="file-button">
+              JSON 불러오기
+              <input id="importInput" type="file" accept="application/json,.json" />
+            </label>
+            <button id="clearLocalButton" class="danger-button" type="button">로컬 기록 초기화</button>
+          </div>
+          <p class="help-text">서버 전체 기록 삭제 기능은 없습니다. 이 버튼은 현재 기기의 로컬 백업만 지웁니다.</p>
+        </section>
+      </main>
+    </div>
+
+    <div id="editorOverlay" class="overlay is-hidden" role="presentation">
+      <section
+        class="editor"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="editorTitle"
+      >
+        <button id="closeEditorButton" class="close-button" type="button">닫기</button>
+        <p id="editorDateText" class="label">날짜</p>
+        <h2 id="editorTitle">기록 편집</h2>
+        <p id="editorGoalText" class="goal-text"></p>
+
+        <div class="editor-statuses" aria-label="상태 선택">
+          <button class="status-choice status-S" type="button" data-editor-status="S">성공</button>
+          <button class="status-choice status-F" type="button" data-editor-status="F">실패</button>
+          <button class="status-choice status-P" type="button" data-editor-status="P">패스</button>
+        </div>
+
+        <label id="gymVisitField" class="check-row is-hidden">
+          <input id="gymVisitInput" type="checkbox" />
+          오늘 헬스장 방문
+        </label>
+
+        <label class="memo-field">
+          메모
+          <textarea
+            id="noteInput"
+            maxlength="200"
+            placeholder="오늘의 수행 내용이나 사유를 입력하세요"
+          ></textarea>
+          <span id="noteCounter">0 / 200</span>
+        </label>
+
+        <div class="editor-actions">
+          <button id="deleteRecordButton" class="ghost-button" type="button">기록 비우기</button>
+          <button id="saveEditorButton" class="primary-button" type="button">완료</button>
+        </div>
+      </section>
+    </div>
+
+    <div id="toast" class="toast is-hidden" role="status"></div>
+
+    <script>
+      window.CONFIG = {
+        syncUrl: "https://script.google.com/macros/s/AKfycbwWQk_Bd5rnaBDHq331v8W7itWXjaFF_Xn6XrtGb2Y1Ipi1gW0h6Rq04ZumL3wC5kd2Dg/exec",
+      };
+    </script>
+    <script src="./app.js"></script>
+  </body>
+</html>
