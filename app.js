@@ -74,6 +74,7 @@ const els = {
 
 let records = {};
 let editorState = null;
+let syncStatusTimer = null;
 
 init();
 
@@ -161,9 +162,27 @@ function renderSyncStatus() {
 
 function setSyncError() {
   if (!els.statusBar || !els.syncStatusText || !els.syncDetailText) return;
+  window.clearTimeout(syncStatusTimer);
   els.statusBar.className = "status-bar is-error";
   els.syncStatusText.textContent = "서버 연결 실패, 이 기기에 임시 저장";
   els.syncDetailText.textContent = "기록 새로고침을 누르면 다시 연결을 시도합니다.";
+}
+
+function showSavingState() {
+  if (!getSyncUrl() || !els.statusBar || !els.syncStatusText || !els.syncDetailText) return;
+  window.clearTimeout(syncStatusTimer);
+  els.statusBar.className = "status-bar is-shared is-saving";
+  els.syncStatusText.textContent = "저장 중...";
+  els.syncDetailText.textContent = "Google Sheets에 기록을 보내고 있습니다.";
+}
+
+function showSavedState() {
+  if (!getSyncUrl() || !els.statusBar || !els.syncStatusText || !els.syncDetailText) return;
+  window.clearTimeout(syncStatusTimer);
+  els.statusBar.className = "status-bar is-shared";
+  els.syncStatusText.textContent = "저장 완료";
+  els.syncDetailText.textContent = "Google Sheets에 반영되었습니다.";
+  syncStatusTimer = window.setTimeout(renderSyncStatus, 1800);
 }
 
 function renderMissionCards() {
@@ -373,12 +392,13 @@ function closeEditor() {
   els.editorOverlay.classList.add("is-hidden");
 }
 
-async function saveEditorRecord() {
+function saveEditorRecord() {
   if (!editorState?.status) {
     showToast("성공, 실패, 패스 중 하나를 선택하세요.");
     return;
   }
   const participant = getParticipant(editorState.participantId);
+  const key = getKey(editorState.date, participant.id);
   const record = {
     date: editorState.date,
     participantId: participant.id,
@@ -389,20 +409,38 @@ async function saveEditorRecord() {
     updatedAt: new Date().toISOString(),
   };
 
-  try {
-    await saveRecord(record);
-    closeEditor();
+  records[key] = record;
+  writeLocalRecords(STORAGE_KEY, records);
+  closeEditor();
+  render();
+
+  if (!getSyncUrl()) {
     showToast("기록이 저장되었습니다.");
-  } catch (error) {
-    console.error(error);
-    records[getKey(record.date, record.participantId)] = record;
-    writeLocalRecords(STORAGE_KEY, records);
-    writeLocalRecords(PENDING_KEY, { ...readLocalRecords(PENDING_KEY), [getKey(record.date, record.participantId)]: record });
-    setSyncError();
-    closeEditor();
-    render();
-    showToast("서버 연결 실패, 이 기기에 임시 저장했습니다.");
+    return;
   }
+
+  showSavingState();
+  showToast("저장 중...");
+
+  saveRecord(record)
+    .then((savedRecord) => {
+      records[key] = savedRecord || record;
+      writeLocalRecords(STORAGE_KEY, records);
+      removePendingRecord(key);
+      render();
+      showSavedState();
+      showToast("저장 완료");
+    })
+    .catch((error) => {
+      console.error(error);
+      records[key] = record;
+      writeLocalRecords(STORAGE_KEY, records);
+      writeLocalRecords(PENDING_KEY, { ...readLocalRecords(PENDING_KEY), [key]: record });
+      setSyncError();
+      render();
+      setSyncError();
+      showToast("서버 저장 실패, 이 기기에 임시 저장했습니다.");
+    });
 }
 
 async function deleteEditorRecord() {
@@ -432,7 +470,7 @@ async function saveRecord(record) {
     records[key] = record;
     writeLocalRecords(STORAGE_KEY, records);
     render();
-    return;
+    return record;
   }
 
   const payload = { action: "save", ...record };
@@ -441,14 +479,13 @@ async function saveRecord(record) {
   console.log("서버 응답", result);
   if (!result.ok) throw new Error(result.error || "Server save failed");
 
-  const serverRecords = await fetchServerRecords();
-  if (!serverRecords[key]) {
+  const savedRecord = normalizeRecord(result.record);
+  if (!savedRecord || getKey(savedRecord.date, savedRecord.participantId) !== key) {
     throw new Error("Server save verification failed");
   }
-  records = serverRecords;
+  records[key] = savedRecord;
   writeLocalRecords(STORAGE_KEY, records);
-  renderSyncStatus();
-  render();
+  return savedRecord;
 }
 
 async function refreshFromServer({ silent }) {
@@ -763,6 +800,13 @@ function readLocalRecords(key) {
 
 function writeLocalRecords(key, value) {
   localStorage.setItem(key, JSON.stringify(Object.values(value)));
+}
+
+function removePendingRecord(recordKey) {
+  const pending = readLocalRecords(PENDING_KEY);
+  if (!pending[recordKey]) return;
+  delete pending[recordKey];
+  writeLocalRecords(PENDING_KEY, pending);
 }
 
 function exportJson() {
