@@ -502,6 +502,17 @@ main {
   color: #b3aa9d;
 }
 
+.grid-cell.is-invalid {
+  background: #e9e5de;
+  color: #8f877c;
+}
+
+.grid-cell.is-invalid button {
+  cursor: not-allowed;
+  font-size: 0.58rem;
+  line-height: 1.1;
+}
+
 .grid-cell.is-locked {
   cursor: not-allowed;
 }
