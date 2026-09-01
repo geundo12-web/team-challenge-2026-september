@@ -1,6 +1,7 @@
 const CONFIG = window.CONFIG || { syncUrl: "" };
 
-const START_DATE = "2026-09-01";
+const DISPLAY_START_DATE = "2026-09-01";
+const START_DATE = "2026-09-02";
 const END_DATE = "2026-09-30";
 const STORAGE_KEY = "team-challenge-2026-september-records";
 const PENDING_KEY = "team-challenge-2026-september-pending";
@@ -227,7 +228,7 @@ function getMissionExtra(participantId, date) {
 
 function renderRecordGrid() {
   if (!els.recordGrid) return;
-  const dates = getDateRange(START_DATE, END_DATE);
+  const dates = getDateRange(DISPLAY_START_DATE, END_DATE);
   const header = `<div class="grid-name">이름</div>${dates
     .map((date) => `<div class="grid-day">${Number(date.slice(8))}<span>${getWeekday(date)}</span></div>`)
     .join("")}`;
@@ -236,6 +237,18 @@ function renderRecordGrid() {
     .map((participant) => {
       const cells = dates
         .map((date) => {
+          if (!isWithinPeriod(date)) {
+            return `
+              <div class="grid-cell is-invalid">
+                <button
+                  type="button"
+                  disabled
+                  aria-label="${participant.name} ${date} 시작 전"
+                >시작 전</button>
+              </div>
+            `;
+          }
+
           const record = getEffectiveRecord(date, participant.id);
           const status = getDisplayStatus(record);
           const statusInfo = statusMeta[status] || { label: "미입력", badge: "badge-empty" };
@@ -313,6 +326,7 @@ function renderRankings() {
 }
 
 function handleGridClick(participantId, date) {
+  if (!isWithinPeriod(date)) return;
   if (isFutureDate(date)) return;
   if (isEditableDate(date) && !isAutoPassDate(date, participantId)) {
     openEditor(participantId, date);
@@ -533,6 +547,19 @@ function normalizeRecord(raw) {
 }
 
 function getEffectiveRecord(date, participantId) {
+  if (!isWithinPeriod(date)) {
+    return {
+      date,
+      participantId,
+      participantName: getParticipant(participantId).name,
+      status: "",
+      note: "",
+      gymVisit: false,
+      updatedAt: "",
+      invalid: true,
+    };
+  }
+
   const saved = records[getKey(date, participantId)];
   if (saved) return saved;
   if (isAutoPassDate(date, participantId)) {
@@ -621,7 +648,7 @@ function getJaeseonWeeklyGymStats(date) {
 }
 
 function isAutoPassDate(date, participantId) {
-  return participantId === "geundo" && isWeekend(date);
+  return isWithinPeriod(date) && participantId === "geundo" && isWeekend(date);
 }
 
 function isEditableDate(date) {
