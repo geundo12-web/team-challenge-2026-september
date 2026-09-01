@@ -190,6 +190,15 @@ h3 {
   color: var(--green-2);
 }
 
+.status-bar.is-saving strong {
+  color: #8a6500;
+}
+
+.status-bar.is-saving strong::before {
+  background: #d69717;
+  box-shadow: 0 0 0 4px rgba(214, 151, 23, 0.16);
+}
+
 .status-bar.is-error strong {
   color: var(--red);
 }
