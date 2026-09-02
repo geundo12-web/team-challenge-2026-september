@@ -508,11 +508,28 @@ async function refreshFromServer({ silent }) {
   }
 
   try {
-    await flushPendingRecords();
+    const pendingBeforeRefresh = readLocalRecords(PENDING_KEY);
     records = await fetchServerRecords();
     writeLocalRecords(STORAGE_KEY, records);
     renderSyncStatus();
     render();
+
+    if (Object.keys(pendingBeforeRefresh).length > 0) {
+      try {
+        await flushPendingRecords();
+        records = await fetchServerRecords();
+        writeLocalRecords(STORAGE_KEY, records);
+        renderSyncStatus();
+        render();
+      } catch (pendingError) {
+        console.error(pendingError);
+        records = { ...records, ...readLocalRecords(PENDING_KEY) };
+        writeLocalRecords(STORAGE_KEY, records);
+        setSyncError();
+        render();
+      }
+    }
+
     if (!silent) showToast("최신 기록을 불러왔습니다.");
   } catch (error) {
     console.error(error);
@@ -538,15 +555,43 @@ async function flushPendingRecords() {
 }
 
 async function fetchServerRecords() {
-  const url = `${getSyncUrl()}${getSyncUrl().includes("?") ? "&" : "?"}action=list&t=${Date.now()}`;
+  const listResult = await fetchServerRecordPayload("list");
+  if (listResult.rawRecords.length > 0) {
+    return normalizeServerRecordPayload(listResult);
+  }
+
+  const loadResult = await fetchServerRecordPayload("load").catch((error) => {
+    console.warn("서버 load 요청 실패", error);
+    return null;
+  });
+  if (loadResult && loadResult.rawRecords.length > 0) {
+    return normalizeServerRecordPayload(loadResult);
+  }
+
+  return normalizeServerRecordPayload(listResult);
+}
+
+async function fetchServerRecordPayload(action) {
+  const url = `${getSyncUrl()}${getSyncUrl().includes("?") ? "&" : "?"}action=${action}&t=${Date.now()}`;
   const response = await fetch(url, { cache: "no-store" });
   const result = await response.json();
   const rawRecords = Array.isArray(result.records) ? result.records : Array.isArray(result.data) ? result.data : null;
   if (!response.ok || !result.ok || !Array.isArray(rawRecords)) {
     throw new Error(result.error || "Server records load failed");
   }
+  return { action, result, rawRecords };
+}
+
+function normalizeServerRecordPayload(payload) {
+  const { action, result, rawRecords } = payload;
   const normalized = normalizeRecords(rawRecords);
-  console.log("서버에서 불러온 원본 기록", rawRecords);
+  console.log(`서버에서 불러온 원본 기록 (${action})`, rawRecords);
+  console.log("서버 응답 디버그", {
+    spreadsheetId: result.spreadsheetId,
+    spreadsheetName: result.spreadsheetName,
+    sheetName: result.sheetName,
+    lastRow: result.lastRow,
+  });
   console.log("정규화된 기록", normalized);
   return normalized;
 }
@@ -579,10 +624,11 @@ function normalizeRecords(rawRecords) {
 
 function normalizeRecord(raw) {
   if (!raw || typeof raw !== "object") return null;
-  const date = String(raw.date || "").trim();
-  const participantId = String(raw.participantId || "").trim();
+  const keyParts = String(raw.key || "").trim().split("_");
+  const date = String(raw.date || keyParts[0] || "").trim();
+  const participantId = String(raw.participantId || keyParts[1] || "").trim();
   const participant = getParticipant(participantId);
-  const status = String(raw.status || "").trim();
+  const status = String(raw.status || "").trim().toUpperCase();
   if (!isWithinPeriod(date) || !participant || !["S", "F", "P"].includes(status)) return null;
   return {
     date,
