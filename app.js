@@ -433,13 +433,14 @@ function saveEditorRecord() {
     })
     .catch((error) => {
       console.error(error);
+      const message = String(error.message || error || "알 수 없는 오류");
       records[key] = record;
       writeLocalRecords(STORAGE_KEY, records);
       writeLocalRecords(PENDING_KEY, { ...readLocalRecords(PENDING_KEY), [key]: record });
       setSyncError();
       render();
       setSyncError();
-      showToast("서버 저장 실패, 이 기기에 임시 저장했습니다.");
+      showToast(`서버 저장 실패: ${message}`);
     });
 }
 
@@ -480,12 +481,23 @@ async function saveRecord(record) {
   if (!result.ok) throw new Error(result.error || "Server save failed");
 
   const savedRecord = normalizeRecord(result.record);
-  if (!savedRecord || getKey(savedRecord.date, savedRecord.participantId) !== key) {
+  if (!savedRecord || getKey(savedRecord.date, savedRecord.participantId) !== key || !recordFieldsMatch(record, savedRecord)) {
     throw new Error("Server save verification failed");
   }
   records[key] = savedRecord;
   writeLocalRecords(STORAGE_KEY, records);
   return savedRecord;
+}
+
+function recordFieldsMatch(expected, actual) {
+  return (
+    actual.date === expected.date &&
+    actual.participantId === expected.participantId &&
+    actual.participantName === expected.participantName &&
+    actual.status === expected.status &&
+    actual.note === expected.note &&
+    Boolean(actual.gymVisit) === Boolean(expected.gymVisit)
+  );
 }
 
 async function refreshFromServer({ silent }) {
